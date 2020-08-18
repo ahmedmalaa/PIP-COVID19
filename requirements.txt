@@ -15,3 +15,4 @@ dash_daq==0.2.2
 matplotlib==3.3.1
 pandas==1.1.0
 plotly==4.9.0
+gunicorn==19.0.0
