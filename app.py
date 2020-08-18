@@ -1,4 +1,8 @@
-# Import required libraries
+
+# Copyright (c) 2020, Ahmed M. Alaa
+# Licensed under the BSD 3-clause license (see LICENSE.txt)
+
+
 import os
 import pickle
 import copy
@@ -84,9 +88,9 @@ COUNTRIES        = ["United Kingdom", "Brazil"]
 
 # load models and data for all countries 
 
-if path.exists("PIPmodels\\global_models"):
+if path.exists(os.getcwd() + "\\PIPmodels\\global_models"):
 
-  global_models  = pickle.load(open("PIPmodels\\global_models", 'rb'))
+  global_models  = pickle.load(open(os.getcwd() + "\\PIPmodels\\global_models", 'rb'))
 
 else:
 
@@ -94,24 +98,24 @@ else:
 
   for country in COUNTRIES:
 
-    global_models[country] = pickle.load(open("2020-08-17\\models\\" + country, 'rb'))
+    global_models[country] = pickle.load(open(os.getcwd() + "\\2020-08-17\\models\\" + country, 'rb'))
 
-  pickle.dump(global_models, open("PIPmodels\\global_models", 'wb'))
+  pickle.dump(global_models, open(os.getcwd() + "\\PIPmodels\\global_models", 'wb'))
 
-if path.exists("PIPmodels\\country_data"+"_"+str(dt.date.today())):
+if path.exists(os.getcwd() + "\\PIPmodels\\country_data"+"_"+str(dt.date.today())):
 
-  country_data   = pickle.load(open("PIPmodels\\country_data"+"_"+str(dt.date.today()), 'rb'))
+  country_data   = pickle.load(open(os.getcwd() + "\\PIPmodels\\country_data"+"_"+str(dt.date.today()), 'rb'))
 
 else:
 
   country_data = get_COVID_DELVE_data(COUNTRIES)
 
-  pickle.dump(country_data, open("PIPmodels\\country_data", 'wb'))
+  pickle.dump(country_data, open(os.getcwd() + "\\PIPmodels\\country_data", 'wb'))
 
  
-if path.exists("PIPmodels\\projections"+"_"+str(dt.date.today())):
+if path.exists(os.getcwd() + "\\PIPmodels\\projections"+"_"+str(dt.date.today())):
 
-  global_projections = pickle.load(open("PIPmodels\\projections"+"_"+str(dt.date.today()), 'rb'))
+  global_projections = pickle.load(open(os.getcwd() + "\\PIPmodels\\projections"+"_"+str(dt.date.today()), 'rb'))
 
 else:
 
@@ -119,9 +123,9 @@ else:
 
   for country in COUNTRIES:
 
-    global_projections[country] = pickle.load(open("2020-08-17\\projections\\" + country, 'rb'))
+    global_projections[country] = pickle.load(open(os.getcwd() + "\\2020-08-17\\projections\\" + country, 'rb'))
 
-  pickle.dump(global_models, open("PIPmodels\\global_projections", 'wb'))
+  pickle.dump(global_models, open(os.getcwd() + "\\PIPmodels\\global_projections", 'wb'))
 
 
 TARGETS           = ["Daily Deaths", "Cumulative Deaths", "Reproduction Number"]
@@ -647,8 +651,6 @@ if __name__ == '__main__':
     
     app.server.run(debug=True, threaded=True)
 
-
-# confidence disable and PIP fit
 
 # fix confidence intervals plot
 # Each country has default policy
