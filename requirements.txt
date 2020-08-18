@@ -7,7 +7,6 @@ dash_html_components==1.0.1
 mpld3==0.3
 lmfit==1.0.0
 numpy==1.18.3
-matplotlib==2.2.2
 dash_bootstrap_components==0.7.2
 ruptures==1.0.5
 plotly==4.2.1
