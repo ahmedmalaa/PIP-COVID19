@@ -86,9 +86,9 @@ COUNTRIES        = ["United Kingdom"] #["United States", "United Kingdom", "Ital
 
 # load models and data for all countries 
 
-if path.exists(os.getcwd() + "\\PIPmodels\\global_models"):
+if path.exists(os.getcwd() + "/PIPmodels/global_models"):
 
-  global_models  = pickle.load(open(os.getcwd() + "\\PIPmodels\\global_models", 'rb'))
+  global_models  = pickle.load(open(os.getcwd() + "/PIPmodels/global_models", 'rb'))
 
 else:
 
@@ -96,24 +96,24 @@ else:
 
   for country in COUNTRIES:
 
-    global_models[country] = pickle.load(open(os.getcwd() + "\\2020-09-01\\models\\" + country, 'rb'))
+    global_models[country] = pickle.load(open(os.getcwd() + "/2020-09-01/models/" + country, 'rb'))
 
-  pickle.dump(global_models, open(os.getcwd() + "\\PIPmodels\\global_models", 'wb'))
+  pickle.dump(global_models, open(os.getcwd() + "/PIPmodels/global_models", 'wb'))
 
-if path.exists(os.getcwd() + "\\PIPmodels\\country_data"+"_"+str(dt.date.today())):
+if path.exists(os.getcwd() + "/PIPmodels/country_data"+"_"+str(dt.date.today())):
 
-  country_data   = pickle.load(open(os.getcwd() + "\\PIPmodels\\country_data"+"_"+str(dt.date.today()), 'rb'))
+  country_data   = pickle.load(open(os.getcwd() + "/PIPmodels/country_data"+"_"+str(dt.date.today()), 'rb'))
 
 else:
 
   country_data = get_COVID_DELVE_data(COUNTRIES)
 
-  pickle.dump(country_data, open(os.getcwd() + "\\PIPmodels\\country_data", 'wb'))
+  pickle.dump(country_data, open(os.getcwd() + "/PIPmodels/country_data", 'wb'))
 
  
-if path.exists(os.getcwd() + "\\PIPmodels\\projections"+"_"+str(dt.date.today())):
+if path.exists(os.getcwd() + "/PIPmodels/projections"+"_"+str(dt.date.today())):
 
-  global_projections = pickle.load(open(os.getcwd() + "\\PIPmodels\\projections"+"_"+str(dt.date.today()), 'rb'))
+  global_projections = pickle.load(open(os.getcwd() + "/PIPmodels/projections"+"_"+str(dt.date.today()), 'rb'))
 
 else:
 
@@ -121,12 +121,12 @@ else:
 
   for country in COUNTRIES:
 
-    global_projections[country] = pickle.load(open(os.getcwd() + "\\2020-09-01\\projections\\" + country, 'rb'))
+    global_projections[country] = pickle.load(open(os.getcwd() + "/2020-09-01/projections/" + country, 'rb'))
 
-  pickle.dump(global_models, open(os.getcwd() + "\\PIPmodels\\global_projections", 'wb'))
+  pickle.dump(global_models, open(os.getcwd() + "/PIPmodels/global_projections", 'wb'))
 
 
-npi_model         = pickle.load(open(os.getcwd() + "\\PIPmodels\\R0Forecaster", 'rb'))
+npi_model         = pickle.load(open(os.getcwd() + "/PIPmodels/R0Forecaster", 'rb'))
 
 TARGETS           = ["Daily Deaths", "Cumulative Deaths", "Reproduction Number"]
 
@@ -750,36 +750,3 @@ if __name__ == '__main__':
     
     app.server.run(debug=True, threaded=True)
 
-
-# policy inputs
-# responsivness, errors and cumul responsivness
-# show dates on hover of view from
-
-# start R0 only from shift
-# calendar
-# Each country has default policy
-# Print numbers on top
-# Model update time
-# confidence in R0 and policy timeline
-
-# imput date
-# current and extra deaths
-# textual explanation and caveats
-
-
-
-
-
-# -------------------------------------
-# uncertainty: vars + R0
-
-
-# Archive dates
-# reqs file
-# update
-# try Italy and Germany and Brazil
-
-
-# comments below
-# upload date
-# button
