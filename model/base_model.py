@@ -61,6 +61,46 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+def sample_binomial(n, p):
+    
+    if (n < 1000) and (n > 0):
+        
+        sampled_n = np.random.binomial(n=n, p=p)
+        
+    elif n < 0:  
+        
+        sampled_n = 0
+    
+    else:
+        
+        sampled_n = int(np.random.normal() * np.sqrt(n * p * (1-p)) + n * p)
+    
+    return sampled_n
+    
+
+
+def collapse_change_points(input_nkbps, offset_duration=14):
+
+    new_nkbps = []
+
+    for k in range(len(input_nkbps)):
+    
+        if k==0:
+        
+            new_nkbps.append(input_nkbps[k])
+        
+        elif input_nkbps[k] - input_nkbps[k-1] >= offset_duration:    
+        
+            new_nkbps.append(input_nkbps[k])
+    
+        else:
+        
+            new_nkbps[-1] = input_nkbps[k]
+    
+    return new_nkbps  
+
+
+
 class SEIR_base:
 
     def __init__(self, N_population, T_incubation=3, T_infectious=9, #T_incubation=1-14, T_infectious=7-12, 
@@ -116,7 +156,7 @@ class SEIR_base:
         
         for k in range(len(R0_params)):
             
-            self.params_init[R0_params[k]] = (1.0, 0.25, 6.0) 
+            self.params_init[R0_params[k]] = (1.0, 0.25, 6) 
             
         for m in range(len(k_params)):
             
@@ -135,8 +175,6 @@ class SEIR_base:
         
         mu_IC            = self.p_IC / self.T_IC
         mu_CD            = self.p_CD /self.T_CD  
-        
-        # FIX THESE
     
         dSdt = -self.beta(t) * I * S / self.N
         dEdt = self.beta(t) * I * S / self.N - self.sigma * E
@@ -218,7 +256,7 @@ class SEIR_base:
         t                = np.linspace(0, days - 1, days)
         ret              = odeint(self.ODEs, compartments_0, t)
         S, E, I, C, R, D = ret.T
-        R0_t            = [(self.beta(i) * self.sigma) / ((self.gamma + (self.p_CD/self.T_CD)) * ((self.p_CD/self.T_CD) + self.sigma)) for i in range(len(t))]
+        R0_t             = [(self.beta(i) * self.sigma) / ((self.gamma + (self.p_CD/self.T_CD)) * ((self.p_CD/self.T_CD) + self.sigma)) for i in range(len(t))]
                 
         return t, S, E, I, C, R, D, R0_t
     
@@ -229,7 +267,7 @@ class SEIR_base:
         lambda_l1       = 3
         L_reg           = 0.01
         
-        cases_deaths    = dict({"deaths":np.cumsum(smooth_curve_1d(deaths_train[self.shift:])), 
+        cases_deaths    = dict({"deaths":np.cumsum(smooth_curve_1d(deaths_train[self.shift:])),    
                                 "cases":np.cumsum(smooth_curve_1d(cases_train[self.shift:])),
                                 "mix":np.hstack((np.cumsum(smooth_curve_1d(deaths_train[self.shift:])), 
                                                  L_reg * np.cumsum(smooth_curve_1d(cases_train[self.shift:]))))})
@@ -240,7 +278,8 @@ class SEIR_base:
   
         cpmodel         = rpt.Pelt(model="rbf").fit(mobility_train[self.shift:, :])
         self.n_bkps     = cpmodel.predict(pen=lambda_l1)
-        self.n_bkps     = [0] + list(self.n_bkps) #list(np.sort(np.array(msk_n_bkps + self.n_bkps))) #   
+        self.n_bkps     = [0] + list(np.sort(np.array(msk_n_bkps + self.n_bkps))) 
+        self.n_bkps     = collapse_change_points(self.n_bkps, offset_duration=7)
         self.chpts      = len(self.n_bkps) - 2  
  
         self.initialze_hyperparameters()
@@ -291,6 +330,23 @@ class SEIR_base:
         
         self.best_params = dict(train_result.best_values)
         #self.opt_results = train_result
+        #self.lmfit_model = mod
+
+        # optimize last R0 period
+        
+        Y_trn  = smooth_curve_1d(deaths_train[self.shift:])[self.N_train - 30:]
+        R_L    = np.linspace(0.25, 6.0, 1000)
+        losses = []
+
+        for R_ in R_L:
+            
+            self.best_params["R_0_" + str(self.chpts)] = R_
+            deaths_pred, _, _                          = self.predict(days + self.shift)
+            Y_pred                                     = np.array(deaths_pred[self.N_train + self.shift - 30:])
+
+            losses.append(np.mean(np.abs(Y_trn - Y_pred)))
+            
+        self.best_params["R_0_" + str(self.chpts)] = R_L[np.argmin(np.array(losses))]   
         
     
     def predict(self, days, R0_forecast=None):
@@ -324,6 +380,64 @@ class SEIR_base:
         return deaths, cases, R0_t
     
     
+    def sample_compartments(self, t, S, E, I, C, R, D):
     
+        mu_IC    = self.p_IC / self.T_IC
+        mu_CD    = self.p_CD / self.T_CD
+        
+        I_sample = sample_binomial(n=int(S), p=(I / self.N))
+        E_sample = sample_binomial(n=int(E), p=self.sigma)
+        I_IC     = sample_binomial(n=int(I), p=mu_IC) 
+        C_CD     = sample_binomial(n=int(C), p=mu_CD)
+        C_CR_CD  = sample_binomial(n=int(C), p=(1 - self.p_CD) * (1 / self.T_CR))
+        I_IC_g   = sample_binomial(n=int(I), p=self.gamma * (1 - self.p_IC))    
+    
+        dSdt     = -1 * self.beta(t) * I_sample 
+        dEdt     = self.beta(t) * I_sample - E_sample
+        dIdt     = E_sample - I_IC - sample_binomial(n=int(I), p=self.gamma * (1 - self.p_IC))
+        dCdt     = I_IC - C_CD - C_CR_CD
+        dRdt     = I_IC_g + C_CR_CD 
+        dDdt     = C_CD
+    
+        return dSdt, dEdt, dIdt, dCdt, dRdt, dDdt
+
+
+    def sample_forecasts(self, horizon=30):
+        
+        t_all, S_all, E_all, I_all, C_all, R_all, D_all, _ = self.evaluate(self.N_train, **self.best_params)
+        t, S, E, I, C, R, D                                = t_all[-1], S_all[-1], E_all[-1], I_all[-1], C_all[-1], R_all[-1], D_all[-1]  
+        forecast_                                          = []  
+    
+        for t_ in range(horizon):
+    
+            dSdt, dEdt, dIdt, dCdt, dRdt, dDdt = self.sample_compartments(self.N_train + t_, S, E, I, C, R, D)
+        
+            S = S + dSdt 
+            E = E + dEdt
+            I = I + dIdt 
+            C = C + dCdt 
+            R = R + dRdt 
+            D = D + dDdt
+
+            forecast_.append(D)
+    
+        return forecast_
+
+
+    def compute_confidence_intervals(self, horizon=30, n_samples=1000, q=0.95):
+        
+        D_samples = []
+
+        for _ in range(n_samples):
+    
+            D_sample = self.sample_forecasts(horizon=horizon)
+    
+            D_samples.append(np.diff(np.array(D_sample)))
+    
+        
+        D_upper  = np.quantile(np.array(D_samples), q=q, axis=0)
+        D_lower  = np.quantile(np.array(D_samples), q=1-q, axis=0)
+        
+        return D_upper, D_lower
 
 

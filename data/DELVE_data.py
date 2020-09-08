@@ -91,6 +91,8 @@ def extract_data(covid_data, country_name="United Kingdom"):
                                    "Smoothened mobility data": mobility_scores,
                                    "NPI data": NPI_data,
                                    "Metadata": meta_data_dict , 
-                                   "Data dates": dates})
+                                   "Data dates": dates,
+                                   "wheather data":weather_data,
+                                   "testing data":testing_data})
     
     return data_output
