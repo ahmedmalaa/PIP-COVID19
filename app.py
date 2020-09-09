@@ -401,8 +401,6 @@ import os
 from os import path
 
 from model.base_model import *
-from model.R0forecast import * 
-
          
 external_styles = [
 {
