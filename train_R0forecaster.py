@@ -59,6 +59,8 @@ def train_R0forecasting_model():
 									NUM_LAYERS=2, EPOCH=5, LR=0.01, N_STEPS=100, alpha=0.05, mode="LSTM",
 									country_parameters=country_dict, country_models=models)	
 
+	npi_model.fit(X_whether, X_metas, X_mobility, X_NPIs, X_stringency, Y)
+
 	file_npi_model  = open('PIPmodels\\R0Forecaster', 'wb')
 
 	pickle.dump(npi_model, file_npi_model)

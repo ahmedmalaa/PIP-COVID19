@@ -184,6 +184,9 @@ class R0Forecaster(nn.Module):
         
         self.masks_w        = nn.Parameter(torch.rand(1))        
         self.masks_w_q      = nn.Parameter(torch.rand(1))
+
+        self.npi_normalizer = StandardScaler()
+        self.model_mob_npi  = []
         
 
     def forward(self, x):
@@ -205,14 +208,12 @@ class R0Forecaster(nn.Module):
     
     
     def fit(self, X_whether, X_metas, X_mobility, X_NPIs, X_stringency, Y):
-        
-        self.npi_normalizer   = StandardScaler()
-        
+                
         self.model_mob_npi    = self.train_NPI_mobility_layers(X_NPIs, X_mobility, X_metas)
     
-        country_names         = list(npi_model.country_params.keys())
-        self.beta_nromalizers = dict.fromkeys(list(npi_model.country_params.keys()))
-        self.beta_min         = dict.fromkeys(list(npi_model.country_params.keys()))
+        country_names         = list(self.country_params.keys())
+        self.beta_nromalizers = dict.fromkeys(list(self.country_params.keys()))
+        self.beta_min         = dict.fromkeys(list(self.country_params.keys()))
         
         X_NPI_input           = [np.hstack((X_NPIs[k][:, :], X_stringency[k].reshape((-1, 1)))) for k in range(len(X_NPIs))]
         
@@ -370,6 +371,6 @@ class R0Forecaster(nn.Module):
         for k in range(X_mob_flat.shape[1]):
         
             model_mob_npi[k].fit(self.npi_normalizer.transform(X_features), X_mob_flat[:, k])
-    
+            
         return model_mob_npi
         
