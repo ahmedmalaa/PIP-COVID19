@@ -24,6 +24,7 @@ from os import path
 
 from model.base_model import *
 from model.R0forecast import * 
+import train_R0forecaster
 
          
 external_styles = [
