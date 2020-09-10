@@ -201,8 +201,8 @@ class R0Forecaster(nn.Module):
 
         # choose r_out at the last time step
 
-        out   = F.sigmoid(torch.sum(self.out(r_out[:, :, :]) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
-        out_q = F.sigmoid(torch.sum(self.out_q(r_out[:, :, :]) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w_q) * (1-x[:, :, 31]) * x[:, :, 30])
+        out   = F.sigmoid(torch.sum(-1 * torch.abs(self.out(r_out[:, :, :])) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
+        out_q = F.sigmoid(torch.sum(-1 * torch.abs(self.out_q(r_out[:, :, :])) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w_q) * (1-x[:, :, 31]) * x[:, :, 30])
          
         return torch.squeeze(torch.stack([torch.unsqueeze(out, dim=2), torch.unsqueeze(out_q, dim=2)], dim=2), dim=3)
     
@@ -267,7 +267,7 @@ class R0Forecaster(nn.Module):
                 
                 output = self(b_x).view(-1, self.MAX_STEPS, 2)                   # rnn output
 
-                L_reg  = 0
+                L_reg  = 1
                 loss   = (1 - L_reg) * model_loss(output[:, :, 0], b_y, b_m) + L_reg * (self.loss_func(output[:, :, 0] + output[:, :, 1], b_y, b_m, self.q) + self.loss_func(output[:, :, 0] - output[:, :, 1], b_y, b_m, 1 - self.q)) 
                 
                 optimizer.zero_grad()                           # clear gradients for this training step
@@ -276,7 +276,8 @@ class R0Forecaster(nn.Module):
 
                 if step % 50 == 0:
 
-                    print('Epoch: ', epoch, '| train loss: %.4f' % loss.data)
+                    #print('Epoch: ', epoch, '| train loss: %.4f' % loss.data)
+                    print("Epoch: %d \t| \ttrain loss: %.4f" % (epoch, loss.data))
         
     
     def predict(self, X):

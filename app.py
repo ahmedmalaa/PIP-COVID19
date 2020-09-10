@@ -549,12 +549,12 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     npi_policy                                       = dict.fromkeys(npi_vars)                         
 
     npi_policy['npi_workplace_closing']              = (np.sum(np.array(socialdistance)==0) > 0) * 3           #3 
-    npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 2 + 1  #3
-    npi_policy['npi_cancel_public_events']           = (np.sum(np.array(socialdistance)==1) > 0) * 2           #2 
-    npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 1 + 3       #4
+    npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 3  #3
+    npi_policy['npi_cancel_public_events']           = (np.sum(np.array(socialdistance)==1) > 0) * 1 + 1       #2 
+    npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 4           #4
     npi_policy['npi_close_public_transport']         = (np.sum(np.array(socialdistance)==2) > 0) * 2           #2
     npi_policy['npi_stay_at_home']                   = (np.sum(np.array(socialdistance)==4) ==0) * 3           #3
-    npi_policy['npi_internal_movement_restrictions'] = (np.sum(np.array(socialdistance)==2) > 0) * 1 + 1       #2
+    npi_policy['npi_internal_movement_restrictions'] = (np.sum(np.array(socialdistance)==2) > 0) * 2           #2
     npi_policy['npi_international_travel_controls']  = (np.sum(np.array(socialdistance)==2) > 0) * 4           #4  
 
     npi_policy['npi_masks']                          = maskslider                                              #3
@@ -568,6 +568,8 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     cum_death_forecast    = np.cumsum(deaths_forecast) + np.sum(deaths_true)
     deaths_forecast_u     = y_pred_u[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
     deaths_forecast_l     = y_pred_l[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
+
+    deaths_forecast_l[deaths_forecast_l < 0] = 0 
 
     # -------------------------------------------------------------------------------------------------------------------------------------------
 
