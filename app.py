@@ -575,7 +575,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
     if target==0:
 
-      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(y_pred[:DAYS_TILL_TODAY]))
+      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(y_pred)) #[:DAYS_TILL_TODAY]
       Y_MAX_VAL           = Y_MAX_VAL * (1 + PLOT_RATIO)
 
     elif target==1:
