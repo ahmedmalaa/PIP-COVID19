@@ -507,7 +507,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     TRUE_DEATHS_DATES = pd.date_range(start=START_DATE, end=TODAY_DATE)
     FORECAST_DATES    = pd.date_range(start=TODAY_DATE + dt.timedelta(days=1), end=END_DATE)
     MAX_HORIZON       = 120 
-    PLOT_RATIO        = 0.1
+    PLOT_RATIO        = 0.2
 
     predictive_model  = global_models[country]
     country_DELVE_dat = country_data[country]
