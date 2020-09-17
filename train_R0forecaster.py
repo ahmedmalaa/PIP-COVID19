@@ -15,7 +15,7 @@ meta_features  = ["stats_population_density", "stats_median_age", "stats_gdp_per
                   "stats_smoking", "stats_population_urban", "stats_population_school_age"]
 
 
-SEIR_modeldate = "2020-09-01\\" 
+SEIR_modeldate = "2020-09-14\\" 
 
 
 def train_R0forecasting_model():
@@ -44,14 +44,13 @@ def train_R0forecasting_model():
 	X_stringency   = [] 
 
 	for country in country_list: 
-
 		X_whether.append(get_country_features(country_dict[country])[0])
 		X_metas.append(get_country_features(country_dict[country])[1])
 		X_mobility.append(get_country_features(country_dict[country])[2])
 		X_NPIs.append(get_country_features(country_dict[country])[3])
 		X_stringency.append(get_country_features(country_dict[country])[4])
-    
-		Y.append(get_beta(projections[country][3], models[country]))
+
+		Y.append(get_beta(projections[country][3], models[country])[:X_whether[-1].shape[0]])
 		Y[-1][:np.argmax(Y[-1])] = np.max(Y[-1]) 
 
 

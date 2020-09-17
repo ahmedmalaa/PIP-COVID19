@@ -181,9 +181,15 @@ class R0Forecaster(nn.Module):
         self.rnn            = rnn_dict[self.mode]
         self.out            = nn.Linear(self.HIDDEN_UNITS, 8) 
         self.out_q          = nn.Linear(self.HIDDEN_UNITS, 8) 
+        self.out_w          = nn.Sequential(nn.Linear(21, self.HIDDEN_UNITS),
+                                            nn.LeakyReLU(),
+                                            nn.Linear(self.HIDDEN_UNITS, self.HIDDEN_UNITS),
+                                            nn.Tanh(),
+                                            nn.Linear(self.HIDDEN_UNITS, 8))
         
         self.masks_w        = nn.Parameter(torch.rand(1))        
         self.masks_w_q      = nn.Parameter(torch.rand(1))
+        #self.linear_model   = nn.Parameter(torch.rand(8))
 
         self.npi_normalizer = StandardScaler()
         self.model_mob_npi  = []
@@ -191,18 +197,33 @@ class R0Forecaster(nn.Module):
 
     def forward(self, x):
         
+        REAL_ST = x.shape[1]
+        #poly    = PolynomialFeatures(interaction_only=True)
+        #X_numpy = x[:, :, 22:30].detach().numpy().reshape((-1, 8)) 
+        #X_intrc = torch.Tensor(poly.fit_transform(X_numpy).reshape((-1, REAL_ST, 37)))
+        X_intrc = x[:, :, 22:30]
+        
         if self.mode == "LSTM":
 
             r_out, (h_n, h_c) = self.rnn(x[:, :, :21], None)   # None represents zero initial hidden state
 
         else:
 
-            r_out, h_n = self.rnn(x[:, :, :21], None)
+            r_out, h_n        = self.rnn(x[:, :, :21], None)
 
         # choose r_out at the last time step
+ 
+        #w_    = torch.squeeze(F.sigmoid(self.out_w(r_out[:, :, :])), dim=2)
+        #p_eff = torch.sum(torch.mul(-1 * torch.abs(self.linear_model), x[:, :, 22:30]))
 
-        out   = F.sigmoid(torch.sum(-1 * torch.abs(self.out(r_out[:, :, :])) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
-        out_q = F.sigmoid(torch.sum(-1 * torch.abs(self.out_q(r_out[:, :, :])) * x[:, :, 21:29], dim=2) - torch.abs(self.masks_w_q) * (1-x[:, :, 31]) * x[:, :, 30])
+        #out   = F.sigmoid((1 - w_) * x[:, :, -1] + w_ * torch.sum(-1 * torch.mul(torch.abs(self.out(r_out[:, :, :])), x[:, :, 22:30]), dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
+        #out   = F.sigmoid(torch.sum(-1 * torch.mul(torch.abs(self.out(r_out[:, :, :])), x[:, :, 22:30]), dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
+        
+        #print(torch.abs(self.out_w(x[:, :, :21])))
+        #print(X_intrc)
+        
+        out   = F.sigmoid(torch.sum(-1 * torch.mul(torch.abs(self.out_w(x[:, :, :21])), X_intrc), dim=2) - torch.abs(self.masks_w) * (1-x[:, :, 31]) * x[:, :, 30])
+        out_q = F.sigmoid(torch.sum(-1 * torch.abs(self.out_q(r_out[:, :, :])) * x[:, :, 22:30], dim=2) - torch.abs(self.masks_w_q) * (1-x[:, :, 31]) * x[:, :, 30])
          
         return torch.squeeze(torch.stack([torch.unsqueeze(out, dim=2), torch.unsqueeze(out_q, dim=2)], dim=2), dim=3)
     
@@ -214,8 +235,15 @@ class R0Forecaster(nn.Module):
         country_names         = list(self.country_params.keys())
         self.beta_nromalizers = dict.fromkeys(list(self.country_params.keys()))
         self.beta_min         = dict.fromkeys(list(self.country_params.keys()))
+        self.Y_latest_values  = dict.fromkeys(list(self.country_params.keys())) 
         
-        X_NPI_input           = [np.hstack((X_NPIs[k][:, :], X_stringency[k].reshape((-1, 1)))) for k in range(len(X_NPIs))]
+        Y_shifted             = [np.hstack((np.array([1]), Y[k][:len(Y[k])-1])) for k in range(len(Y))]
+        
+        for k in range(len(country_names)):
+        
+            self.Y_latest_values[country_names[k]] = Y_shifted[k]
+        
+        X_NPI_input           = [np.hstack((np.hstack((X_NPIs[k][:, :], X_stringency[k].reshape((-1, 1)))), Y_shifted[k].reshape((-1, 1)))) for k in range(len(X_NPIs))]
         
         X                     = [np.hstack((np.hstack((np.hstack((X_whether[k], X_metas[k])), X_mobility[k])), X_NPI_input[k])) for k in range(len(X_whether))]
         Y_                    = Y.copy() 
@@ -261,13 +289,13 @@ class R0Forecaster(nn.Module):
                 y      = torch.tensor(Y_[batch_indexes])
                 msk    = torch.tensor(loss_masks[batch_indexes])
                 
-                b_x    = Variable(x[:, :, :].view(-1, self.MAX_STEPS, 32))       # self.INPUT_SIZE))   # reshape x to (batch, time_step, input_size)
+                b_x    = Variable(x[:, :, :].view(-1, self.MAX_STEPS, 33))       # self.INPUT_SIZE))   # reshape x to (batch, time_step, input_size)
                 b_y    = Variable(y)                                             # batch y
                 b_m    = Variable(msk)
                 
                 output = self(b_x).view(-1, self.MAX_STEPS, 2)                   # rnn output
 
-                L_reg  = 1
+                L_reg  = 0
                 loss   = (1 - L_reg) * model_loss(output[:, :, 0], b_y, b_m) + L_reg * (self.loss_func(output[:, :, 0] + output[:, :, 1], b_y, b_m, self.q) + self.loss_func(output[:, :, 0] - output[:, :, 1], b_y, b_m, 1 - self.q)) 
                 
                 optimizer.zero_grad()                           # clear gradients for this training step
@@ -312,12 +340,14 @@ class R0Forecaster(nn.Module):
     
     
     def projection(self, days, npi_policy, country="United Kingdom"):
+        
+        # self.Y_shifted
     
         X_whether, X_metas, X_mobility, X_NPIs, X_stringency = get_country_features(self.country_params[country])
         
         X_NPI_input    = np.hstack((X_NPIs, X_stringency.reshape((-1, 1)))) 
         
-        X              = [np.hstack((np.hstack((np.hstack((X_whether, X_metas)), X_mobility)), X_NPI_input))]
+        X              = [np.hstack((np.hstack((np.hstack((np.hstack((X_whether, X_metas)), X_mobility)), X_NPI_input)), self.Y_latest_values[country].reshape((-1, 1))))]
          
         X_NPI_new      = np.array(list(npi_policy.values()))
         X_NPI_new[-1]  = compute_stringency_index(npi_policy)
@@ -328,8 +358,13 @@ class R0Forecaster(nn.Module):
         X_mob_pred     = np.array([self.model_mob_npi[k].predict(X_features) for k in range(len(self.model_mob_npi))])
         
         X_new          = np.hstack((np.hstack((np.hstack((X_whether[-1, :], X_metas[-1, :])), X_mob_pred.reshape((-1,)))), X_NPI_new)) 
-                
+        X_new          = np.hstack((X_new, np.array([self.Y_latest_values[country][-1]]).reshape((-1,))))
+        
+        X_new[22-9:22] = X_mobility[-1, :] 
+        
         X_forecast     = np.vstack((X[0], np.repeat(X_new.reshape((1, -1)), days, axis=0))) 
+        
+        self.X_input   = X_forecast
         
         beta_preds     = self.predict([X_forecast])[0][0] * self.beta_nromalizers[country] + self.beta_min[country]
         beta_pred_CI   = self.predict([X_forecast])[1][0] * self.beta_nromalizers[country] + self.beta_min[country]
@@ -340,7 +375,9 @@ class R0Forecaster(nn.Module):
         beta_pred_l    = beta_pred_l * (beta_pred_l >= 0) 
 
         R0_frc         = get_R0(beta_preds, self.country_models[country])
-    
+        
+        #R0_frc[len(X[0]):] = np.mean(R0_frc[len(X[0]):])
+        
         R0_frc_u       = R0_frc + 0.1 #get_R0(beta_pred_u, self.country_models[country])
 
         R0_frc_l       = R0_frc - 0.1 #get_R0(beta_pred_l, self.country_models[country])
@@ -374,4 +411,3 @@ class R0Forecaster(nn.Module):
             model_mob_npi[k].fit(self.npi_normalizer.transform(X_features), X_mob_flat[:, k])
             
         return model_mob_npi
-        

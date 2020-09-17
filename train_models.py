@@ -72,9 +72,7 @@ def main(args):
     
     """
 
-    #country_list = ["United States", "United Kingdom", "Italy", "Germany", "Brazil", "Japan", "Egypt"]
-
-    country_list = ["Brazil", "Japan", "Egypt"]
+    country_list = ["United States", "United Kingdom", "Italy", "Germany", "Brazil", "Japan", "Egypt"]
 
     country_dict = get_COVID_DELVE_data(country_list)
     

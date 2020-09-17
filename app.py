@@ -61,6 +61,8 @@ CYAN              = "#95E3FA"
 PURPLE_COLOR      = "#AF1CF7"
 DARK_PINK         = "#CA1A57"
 
+model_dates       = "/2020-09-14"
+
 #-------------------------------------------------------
 '''
 Helper functions for style formating and data processing
@@ -97,7 +99,7 @@ else:
 
   for country in COUNTRIES:
 
-    global_models[country] = pickle.load(open(os.getcwd() + "/2020-09-01/models/" + country, 'rb'))
+    global_models[country] = pickle.load(open(os.getcwd() + model_dates + "/models/" + country, 'rb'))
 
   pickle.dump(global_models, open(os.getcwd() + "/PIPmodels/global_models", 'wb'))
 
@@ -122,7 +124,7 @@ else:
 
   for country in COUNTRIES:
 
-    global_projections[country] = pickle.load(open(os.getcwd() + "/2020-09-01/projections/" + country, 'rb'))
+    global_projections[country] = pickle.load(open(os.getcwd() + model_dates + "/projections/" + country, 'rb'))
 
   pickle.dump(global_models, open(os.getcwd() + "/PIPmodels/global_projections", 'wb'))
 
@@ -236,7 +238,7 @@ LEARN_BUTTON    = html.A(dbc.Button("Learn More", style={"bgcolor": "gray"}), hr
 WEBSITE_BUTTON  = html.A(dbc.Button("Go back to website", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/policy-impact-predictor-for-covid-19/", className="two columns")
 FEEDBACK_BUTTON = html.A(dbc.Button("Send Feedback", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/contact-us/", className="two columns")
 GITHUB_BUTTON   = html.A(dbc.Button("GitHub", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/contact-us/", className="two columns")
-UPDATE_BUTTON   = dbc.Button("Update Projections", style={"bgcolor": "gray"})
+UPDATE_BUTTON   = dbc.Button("Reset to Current Policy", style={"bgcolor": "gray"}, id="updatebutton")
 
 
 HEADER  = html.Div([
@@ -303,7 +305,7 @@ SOCIAL_DIST_OPT   = dcc.Checklist(id='socialdistance',
                                            {'label': 'Public transport closure', 'value': 2},
                                            {'label': 'Gatherings restrictions', 'value': 3},
                                            {'label': 'Shelter-in-place' , 'value': 4},
-                                           {'label': 'Internal movement restrictions' , 'value': 5},
+                                           #{'label': 'Internal movement restrictions' , 'value': 5},
                                            {'label': 'Travel restrictions' , 'value': 6}],
                                   value=[0],
                                   labelStyle={"display": "inline-block", "font-size": 11,
@@ -320,6 +322,10 @@ DISPLAY_LIST_3    = dcc.Checklist(options=[{'label': 'Show confidence intervals'
                                   labelStyle={"font-size": 11, "font-family": "Noto Sans JP", "color":GRAY, 'display': 'inline-block'},
                                   id="confidenceint") 
 
+
+DISPLAY_LIST_4    = dcc.Checklist(options=[{'label': 'Logarithmic scale', 'value': 1}], 
+                                  labelStyle={"font-size": 11, "font-family": "Noto Sans JP", "color":GRAY, 'display': 'inline-block'},
+                                  id="logarithmic") 
 
 Num_days          = (dt.date.today() - dt.date(2020, 1, 1)).days 
 BEGIN_DATE        = dcc.Slider(id='dateslider', marks={0: "Jan 1st, 2020", Num_days: "Today"}, 
@@ -391,13 +397,13 @@ PATIENT_INFO_FORM = html.Div(
                 dbc.Col(SOCIAL_SELECT), 
             ], style={"margin-left": MARGIN_INPUT}
                ),
-        #HORIZONTAL_SPACE(1),
-        #dbc.Row(
-        #    [   
-        #        VERTICAL_SPACE(100),
-        #        dbc.Col(UPDATE_BUTTON),
-        #    ], style={"margin-left": MARGIN_INPUT}
-        #       ),
+        HORIZONTAL_SPACE(1),
+        dbc.Row(
+            [   
+                VERTICAL_SPACE(80),
+                dbc.Col(UPDATE_BUTTON),
+            ], style={"margin-left": MARGIN_INPUT}
+               ),
         HORIZONTAL_SPACE(1.5),
         ], style={"box-shadow": BOX_SHADOW, "margin": MARGIN_INPUT, "background-color": PANEL_COLOR, "width": "450px"}),
 
@@ -420,10 +426,10 @@ RESULTS_DISPLAY   = html.Div(
         dbc.Row(dbc.Col(html.Div(CAUTION_STATEMENT, style=PANEL_TEXT_STYLE2))),
         HORIZONTAL_SPACE(.5),
         dbc.Row([dbc.Col(html.Div("Display Options", style=PANEL_TEXT_STYLE3)), VERTICAL_SPACE(10), DISPLAY_LIST_2,
-                 VERTICAL_SPACE(10), DISPLAY_LIST_3, VERTICAL_SPACE(50), BEGIN_SELECT]), 
-        HORIZONTAL_SPACE(2),
+                 VERTICAL_SPACE(10), DISPLAY_LIST_3, VERTICAL_SPACE(10), DISPLAY_LIST_4, VERTICAL_SPACE(60), BEGIN_SELECT]), 
+        HORIZONTAL_SPACE(4), # used to be 2
         dbc.Row(html.Div(dcc.Graph(id="covid_19_forecasts", config={'displayModeBar': False}), style={"marginBottom": ".5em", "margin-top": "0em", "margin-left": MARGIN_INPUT})),                          
-        HORIZONTAL_SPACE(1.25),
+        HORIZONTAL_SPACE(5.5), # used to be 1.25
         ],  style={"box-shadow": BOX_SHADOW, "margin": MARGIN_INPUT, "background-color": PANEL_COLOR, "width": "800px"}),
 
     ]
@@ -472,10 +478,10 @@ app.layout = html.Div([popup, HEADER, html.Div([PATIENT_INFO_FORM, RESULTS_DISPL
     Output("covid_19_forecasts", "figure"),
     [Input("target", "value"), Input("horizonslider", "value"), Input("maskslider", "value"), Input("country", "value"),
      Input("pipfit", "value"), Input("confidenceint", "value"), Input("dateslider", "value"), Input("socialdistance", "value"),
-     Input("school_closure", "value")]) 
+     Input("school_closure", "value"), Input("logarithmic", "value")]) 
 
 
-def update_risk_score(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, socialdistance, school_closure):
+def update_risk_score(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, socialdistance, school_closure, logarithmic):
 
 
     """
@@ -484,13 +490,21 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     """
 
     SHOW_PIP_FIT      = False
+    SHOW_LOG          = False
     SHOW_CONFIDENCE   = True
+
+    if type(logarithmic)==list:
+
+      if len(logarithmic) > 0:
+
+        SHOW_LOG  = True
 
     if type(pipfit)==list:
 
       if len(pipfit) > 0:
 
         SHOW_PIP_FIT  = True
+
 
     if type(confidenceint) !=list or len(confidenceint)==0:   
       
@@ -507,7 +521,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     TRUE_DEATHS_DATES = pd.date_range(start=START_DATE, end=TODAY_DATE)
     FORECAST_DATES    = pd.date_range(start=TODAY_DATE + dt.timedelta(days=1), end=END_DATE)
     MAX_HORIZON       = 120 
-    PLOT_RATIO        = 0.2
+    PLOT_RATIO        = 0.1
 
     predictive_model  = global_models[country]
     country_DELVE_dat = country_data[country]
@@ -548,23 +562,25 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
     npi_policy                                       = dict.fromkeys(npi_vars)                         
 
-    npi_policy['npi_workplace_closing']              = (np.sum(np.array(socialdistance)==0) > 0) * 3           #3 
-    npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 3  #3
-    npi_policy['npi_cancel_public_events']           = (np.sum(np.array(socialdistance)==1) > 0) * 1 + 1       #2 
-    npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 4           #4
-    npi_policy['npi_close_public_transport']         = (np.sum(np.array(socialdistance)==2) > 0) * 2           #2
-    npi_policy['npi_stay_at_home']                   = (np.sum(np.array(socialdistance)==4) ==0) * 3           #3
-    npi_policy['npi_internal_movement_restrictions'] = (np.sum(np.array(socialdistance)==2) > 0) * 2           #2
-    npi_policy['npi_international_travel_controls']  = (np.sum(np.array(socialdistance)==2) > 0) * 4           #4  
 
-    npi_policy['npi_masks']                          = maskslider                                              #3
+    npi_policy['npi_workplace_closing']              = (np.sum(np.array(socialdistance)==0) > 0) * 2 + 1           #3 
+    npi_policy['npi_cancel_public_events']           = (np.sum(np.array(socialdistance)==1) > 0) * 1 + 1           #2 
+    npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 1 + 2  #3
+    npi_policy['npi_close_public_transport']         = (np.sum(np.array(socialdistance)==2) > 0) * 2               #2
+    npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 4               #4
+
+    npi_policy['npi_stay_at_home']                   = (np.sum(np.array(socialdistance)==4) > 0) * 3               #3
+    #npi_policy['npi_internal_movement_restrictions'] = (np.sum(np.array(socialdistance)==5) > 0) * 2              #2
+    npi_policy['npi_internal_movement_restrictions'] = 2
+    npi_policy['npi_international_travel_controls']  = (np.sum(np.array(socialdistance)==6) > 0) * 2 + 2           #4  
+
+    npi_policy['npi_masks']                          = maskslider * .5                                             #3
     npi_policy['stringency']                         = 0   
-
 
     (y_pred, y_pred_u, y_pred_l), (R0_frc, R0_frc_u, R0_frc_l) = npi_model.projection(days=MAX_HORIZON, npi_policy=npi_policy, country=country)
 
     deaths_forecast       = y_pred[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
-    R0_t_forecast         = smooth_curve_1d(R0_frc[dateslider : DAYS_TILL_TODAY + horizonslider - 1])
+    R0_t_forecast         = R0_frc[dateslider : DAYS_TILL_TODAY + horizonslider - 1] #smooth_curve_1d(R0_frc[dateslider : DAYS_TILL_TODAY + horizonslider - 1])
     cum_death_forecast    = np.cumsum(deaths_forecast) + np.sum(deaths_true)
     deaths_forecast_u     = y_pred_u[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
     deaths_forecast_l     = y_pred_l[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
@@ -575,7 +591,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
     if target==0:
 
-      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(y_pred[:DAYS_TILL_TODAY])) # [:DAYS_TILL_TODAY + horizonslider - 1] 
+      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(y_pred[:DAYS_TILL_TODAY + horizonslider - 1])) 
       Y_MAX_VAL           = Y_MAX_VAL * (1 + PLOT_RATIO)
 
     elif target==1:
@@ -586,6 +602,21 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     elif target==2:
       
       Y_MAX_VAL           = 6 
+
+
+    if SHOW_LOG:
+
+      deaths_forecast     = np.log10(deaths_forecast + 1)
+      deaths_forecast_u   = np.log10(deaths_forecast_u + 1)
+      deaths_forecast_l   = np.log10(deaths_forecast_l + 1)
+      deaths_smooth       = np.log10(deaths_smooth + 1)
+      deaths_true         = np.log10(deaths_true + 1)
+      PIP_MODEL_FIT       = np.log10(PIP_MODEL_FIT + 1)
+      Y_MAX_VAL           = np.log10(Y_MAX_VAL)
+
+      if Y_AXIS_NAME=="Daily Deaths":
+
+        Y_AXIS_NAME   = "Daily Deaths (Log-scale)"
 
     LINE_WIDTH        = 2
     LINE_WIDTH_       = 3
@@ -703,10 +734,10 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
 @app.callback(
     Output("socialdistance", "value"), 
-    [Input("country", "value")]) 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
 
 
-def update_NPIs(country):
+def update_NPIs(country, updatebutton):
 
   social_dist_measure = ["npi_workplace_closing", "npi_cancel_public_events", "npi_close_public_transport", 
                          "npi_gatherings_restrictions", "npi_stay_at_home", "npi_internal_movement_restrictions", 
@@ -715,33 +746,52 @@ def update_NPIs(country):
   country_NPI_data    = country_data[country]["NPI data"][social_dist_measure].fillna(method="ffill")
   NPI_selections      = np.where(np.array(country_NPI_data)[-1, :]>0)[0]
 
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
+
+    if updatebutton > 0:
+
+      NPI_selections  = np.where(np.array(country_NPI_data)[-1, :]>0)[0]
+
   return list(NPI_selections)
 
 
 @app.callback(
     Output("maskslider", "value"), 
-    [Input("country", "value")]) 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
 
-def update_mask_info(country):
+def update_mask_info(country, updatebutton):
 
   country_NPI_data    = country_data[country]["NPI data"]["npi_masks"].fillna(method="ffill")
   mask_selection      = int(np.array(country_NPI_data)[-1])
 
-  return mask_selection  
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
 
+    if updatebutton > 0:
+
+      mask_selection  = int(np.array(country_NPI_data)[-1])
+
+
+  return mask_selection  
 
 @app.callback(
     Output("school_closure", "value"), 
-    [Input("country", "value")]) 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
 
-def update_school_info(country):
+def update_school_info(country, updatebutton):
 
   school_options      = ["No", "Yes"]
   country_NPI_data    = country_data[country]["NPI data"]["npi_school_closing"].fillna(method="ffill")
   school_closure      = school_options [(np.array(country_NPI_data)[-1] > 0) * 1]
 
-  return school_closure    
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
 
+    if updatebutton > 0:
+
+      school_closure  = school_options [(np.array(country_NPI_data)[-1] > 0) * 1]
+
+
+  return school_closure    
+   
 
 #-----------------------------------------------------
 '''
