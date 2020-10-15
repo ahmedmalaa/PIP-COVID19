@@ -21,9 +21,10 @@ import dash_dangerously_set_inner_html
 import numpy as np
 import os
 from os import path
-import json
 
 from model.base_model import *
+from model.R0forecast import * 
+import train_R0forecaster
 
          
 external_styles = [
@@ -61,7 +62,6 @@ PURPLE_COLOR      = "#AF1CF7"
 DARK_PINK         = "#CA1A57"
 
 model_dates       = "/2020-10-08"
-
 
 #-------------------------------------------------------
 '''
@@ -129,7 +129,7 @@ else:
   pickle.dump(global_models, open(os.getcwd() + "/PIPmodels/global_projections", 'wb'))
 
 
-npi_model         = pickle.load(open(os.getcwd() + "/PIPmodels/R0NPIs", 'rb'))
+npi_model         = pickle.load(open(os.getcwd() + "/PIPmodels/R0Forecaster", 'rb'))
 
 TARGETS           = ["Daily Deaths", "Cumulative Deaths", "Reproduction Number"]
 
@@ -238,9 +238,8 @@ LEARN_BUTTON    = html.A(dbc.Button("Learn More", style={"bgcolor": "gray"}), hr
 WEBSITE_BUTTON  = html.A(dbc.Button("Go back to website", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/policy-impact-predictor-for-covid-19/", className="two columns")
 FEEDBACK_BUTTON = html.A(dbc.Button("Send Feedback", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/contact-us/", className="two columns")
 GITHUB_BUTTON   = html.A(dbc.Button("GitHub", style={"bgcolor": "gray"}), href="https://www.vanderschaar-lab.com/contact-us/", className="two columns")
+UPDATE_BUTTON   = dbc.Button("Reset to Current Policy", style={"bgcolor": "gray"}, id="updatebutton")
 
-UPDATE_BUTTON   = dbc.Button("Reset to Current Trend", style={"bgcolor": "gray"}, id="updatebutton")
-POLICY_BUTTON   = dbc.Button("Apply Policy", style={"bgcolor": "gray"}, id="policybutton")
 
 HEADER  = html.Div([
 
@@ -401,10 +400,7 @@ PATIENT_INFO_FORM = html.Div(
         HORIZONTAL_SPACE(1),
         dbc.Row(
             [   
-                #VERTICAL_SPACE(80),
-                VERTICAL_SPACE(5),
-                dbc.Col(POLICY_BUTTON),
-                VERTICAL_SPACE(5),
+                VERTICAL_SPACE(80),
                 dbc.Col(UPDATE_BUTTON),
             ], style={"margin-left": MARGIN_INPUT}
                ),
@@ -418,7 +414,6 @@ PATIENT_INFO_FORM = html.Div(
 # Create the results display panel
 
 CAUTION_STATEMENT = "Disclaimer: PIP uses machine learning to predict the most likely trajectory of COVID-19 deaths based on current knowledge and data, but will not provide 100% accurate predictions. Click on the 'Learn more' button to read our model's assumptions and limitations."
-NOTE_STATEMENT    = "Note: The PIP model was last updated on October 8, 2020. Data used for model training and result visualization is pulled daily from the DELVE Global COVID-19 project, an initiative by the Royal Society. For more information, visit: https://github.com/rs-delve/"
 
 
 RESULTS_DISPLAY   = html.Div(
@@ -434,11 +429,7 @@ RESULTS_DISPLAY   = html.Div(
                  VERTICAL_SPACE(10), DISPLAY_LIST_3, VERTICAL_SPACE(10), DISPLAY_LIST_4, VERTICAL_SPACE(60), BEGIN_SELECT]), 
         HORIZONTAL_SPACE(4), # used to be 2
         dbc.Row(html.Div(dcc.Graph(id="covid_19_forecasts", config={'displayModeBar': False}), style={"marginBottom": ".5em", "margin-top": "0em", "margin-left": MARGIN_INPUT})),                          
-        #HORIZONTAL_SPACE(5.5), # used to be 1.25
-        HORIZONTAL_SPACE(1.25),
-        dbc.Row(dbc.Col(html.Div(NOTE_STATEMENT, style=PANEL_TEXT_STYLE2))),
-        HORIZONTAL_SPACE(1.3),
-        dbc.Row(html.Div(id='intermediate-value', style={'display': 'none'})),
+        HORIZONTAL_SPACE(5.5), # used to be 1.25
         ],  style={"box-shadow": BOX_SHADOW, "margin": MARGIN_INPUT, "background-color": PANEL_COLOR, "width": "800px"}),
 
     ]
@@ -481,35 +472,16 @@ popup = html.Div([
     '''),
 ]) 
 
-
 app.layout = html.Div([popup, HEADER, html.Div([PATIENT_INFO_FORM, RESULTS_DISPLAY], className="row app-center")])
-
-@app.callback(Output('intermediate-value', 'children'), [Input("policybutton", "n_clicks"), Input("updatebutton", "n_clicks")])
-def save_clicks(policybutton, updatebutton):
-
-  ctx                     = dash.callback_context
-
-  if ctx.triggered[0]["prop_id"] == "policybutton.n_clicks":
-
-    last_click            = "policybutton.n_clicks" 
-
-  elif ctx.triggered[0]["prop_id"] == "updatebutton.n_clicks":  
-
-    last_click            = "updatebutton.n_clicks"
-
-
-  return json.dumps(last_click)
  
 @app.callback(
     Output("covid_19_forecasts", "figure"),
     [Input("target", "value"), Input("horizonslider", "value"), Input("maskslider", "value"), Input("country", "value"),
      Input("pipfit", "value"), Input("confidenceint", "value"), Input("dateslider", "value"), Input("socialdistance", "value"),
-     Input("school_closure", "value"), Input("logarithmic", "value"), Input("policybutton", "n_clicks"), Input("updatebutton", "n_clicks"),
-     Input('intermediate-value', 'children')]) 
+     Input("school_closure", "value"), Input("logarithmic", "value")]) 
 
 
-def update_risk_score(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, 
-                      socialdistance, school_closure, logarithmic, policybutton, updatebutton, intermediate):
+def update_risk_score(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, socialdistance, school_closure, logarithmic):
 
 
     """
@@ -572,13 +544,18 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
       PIP_MODEL_FIT       = global_projections[country][0][:DAYS_TILL_TODAY-1] 
 
     #####
-    deaths_pred           = global_projections[country][0]#[DAYS_TILL_TODAY-1:DAYS_TILL_TODAY + horizonslider-1]
+    deaths_forecast       = global_projections[country][0][DAYS_TILL_TODAY-1:DAYS_TILL_TODAY + horizonslider-1]
     PIP_MODEL_FIT         = global_projections[country][0][:DAYS_TILL_TODAY-1]    
     #####
 
     R0_t_forecast         = global_projections[country][3][dateslider:DAYS_TILL_TODAY + horizonslider-1]
     deaths_CI_l           = global_projections[country][2][:horizonslider]
     deaths_CI_u           = global_projections[country][1][:horizonslider] 
+
+    #deaths_CI             = 50 * np.ones(len(deaths_CI_u))
+
+    #deaths_forecast_u     = deaths_forecast + deaths_CI
+    #deaths_forecast_l     = deaths_forecast - deaths_CI
 
 
     # -------------------------------------------------------------------------------------------------------------------------------------------
@@ -599,60 +576,36 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 1 + 2  #3
     npi_policy['npi_close_public_transport']         = (np.sum(np.array(socialdistance)==2) > 0) * 2               #2
     npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 4               #4
+
     npi_policy['npi_stay_at_home']                   = (np.sum(np.array(socialdistance)==4) > 0) * 3               #3
+    #npi_policy['npi_internal_movement_restrictions'] = (np.sum(np.array(socialdistance)==5) > 0) * 2              #2
     npi_policy['npi_internal_movement_restrictions'] = 2
     npi_policy['npi_international_travel_controls']  = (np.sum(np.array(socialdistance)==6) > 0) * 2 + 2           #4  
+
     npi_policy['npi_masks']                          = maskslider * .5                                             #3
     npi_policy['stringency']                         = 0   
 
-    policy_var            = (np.sum(np.array(socialdistance)==0) > 0) * (2**0)  
-    policy_var            = policy_var + (np.sum(np.array(socialdistance)==1) > 0) * (2**1) 
-    policy_var            = policy_var + (((school_closure==True) | (school_closure=="Yes")) * (2**2))
-    policy_var            = policy_var + (np.sum(np.array(socialdistance)==2) > 0)  * (2**3)
-    policy_var            = policy_var + (np.sum(np.array(socialdistance)==3) > 0)  * (2**4)
-    policy_var            = policy_var + (np.sum(np.array(socialdistance)==4) > 0)  * (2**5)
-    policy_var            = policy_var + (np.sum(np.array(socialdistance)==6) > 0)  * (2**6)
-    R0_factor             = 1
+    (y_pred, y_pred_u, y_pred_l), (R0_frc, R0_frc_u, R0_frc_l) = npi_model.projection(days=MAX_HORIZON, npi_policy=npi_policy, country=country)
 
-    # Check why model predictions don't match in notebook
-    current_R0            = global_projections[country][3][DAYS_TILL_TODAY-1] - 0.5
-    R_frcst               = current_R0 * np.ones(MAX_HORIZON)
+    #####deaths_forecast       = y_pred[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
+    #####R0_t_forecast         = R0_frc[dateslider : DAYS_TILL_TODAY + horizonslider - 1] #smooth_curve_1d(R0_frc[dateslider : DAYS_TILL_TODAY + horizonslider - 1])
+    cum_death_forecast    = np.cumsum(deaths_forecast) + np.sum(deaths_true)
+    #####deaths_forecast_u     = y_pred_u[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
+    #####deaths_forecast_l     = y_pred_l[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
 
-    ctx                   = dash.callback_context
+    R0_factor             = np.mean(R0_frc[DAYS_TILL_TODAY+1:DAYS_TILL_TODAY+10]) / np.mean(R0_frc[DAYS_TILL_TODAY-10:DAYS_TILL_TODAY])
 
-    if ctx.triggered[0]["prop_id"] == "policybutton.n_clicks":
+    current_R0            = global_projections[country][3][DAYS_TILL_TODAY-1]
 
-      R0_factor             = npi_model[int(maskslider)][int(policy_var )]
-      R_frcst               = current_R0 * R0_factor * np.ones(MAX_HORIZON)
-      save_clicks(policybutton, updatebutton)
-
-    elif ctx.triggered[0]["prop_id"] == "updatebutton.n_clicks":  
-
-      R_frcst               = current_R0 * np.ones(MAX_HORIZON) 
-      save_clicks(policybutton, updatebutton)
-
-    else:
-    
-      if json.loads(intermediate) == "policybutton.n_clicks":
-
-        R0_factor           = npi_model[int(maskslider)][int(policy_var )]
-        R_frcst             = current_R0 * R0_factor * np.ones(MAX_HORIZON) 
-
-      if json.loads(intermediate) == "updatebutton.n_clicks": 
-
-        R_frcst             = current_R0 * np.ones(MAX_HORIZON) 
-
-    deaths_pred, _, R_t   = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=R_frcst)
+    deaths_pred, _, R_t   = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=current_R0 * R0_factor * np.ones(MAX_HORIZON))
+    deaths_forecast       = deaths_pred[DAYS_TILL_TODAY-1:DAYS_TILL_TODAY + horizonslider-1]
     R0_t_forecast         = R_t 
 
-    deaths_forecast       = deaths_pred[DAYS_TILL_TODAY-1:DAYS_TILL_TODAY + horizonslider-1]
-    
-    cum_death_forecast    = np.cumsum(deaths_forecast) + np.sum(deaths_true)
 
     # CIs
 
-    deaths_pred_u, _, R_u = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=R_frcst + 0.2)
-    deaths_pred_l, _, R_l = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=R_frcst - 0.2)
+    deaths_pred_u, _, R_u = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=current_R0 * R0_factor * np.ones(MAX_HORIZON) + 0.1)
+    deaths_pred_l, _, R_l = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=current_R0 * R0_factor * np.ones(MAX_HORIZON) - 0.1)
 
     deaths_forecast_u     = deaths_pred_u[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
     deaths_forecast_l     = deaths_pred_l[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
@@ -663,7 +616,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
     if target==0:
 
-      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(deaths_forecast_u)) #y_pred
+      Y_MAX_VAL           = np.maximum(np.max(deaths_smooth), np.max(deaths_forecast[:DAYS_TILL_TODAY + horizonslider - 1])) #y_pred
       Y_MAX_VAL           = Y_MAX_VAL * (1 + PLOT_RATIO)
 
     elif target==1:
@@ -802,7 +755,68 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     }
 
     return plot_dict
- 
+
+
+@app.callback(
+    Output("socialdistance", "value"), 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
+
+
+def update_NPIs(country, updatebutton):
+
+  social_dist_measure = ["npi_workplace_closing", "npi_cancel_public_events", "npi_close_public_transport", 
+                         "npi_gatherings_restrictions", "npi_stay_at_home", "npi_internal_movement_restrictions", 
+                         "npi_international_travel_controls"]
+
+  country_NPI_data    = country_data[country]["NPI data"][social_dist_measure].fillna(method="ffill")
+  NPI_selections      = np.where(np.array(country_NPI_data)[-1, :]>0)[0]
+
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
+
+    if updatebutton > 0:
+
+      NPI_selections  = np.where(np.array(country_NPI_data)[-1, :]>0)[0]
+
+  return list(NPI_selections)
+
+
+@app.callback(
+    Output("maskslider", "value"), 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
+
+def update_mask_info(country, updatebutton):
+
+  country_NPI_data    = country_data[country]["NPI data"]["npi_masks"].fillna(method="ffill")
+  mask_selection      = int(np.array(country_NPI_data)[-1])
+
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
+
+    if updatebutton > 0:
+
+      mask_selection  = int(np.array(country_NPI_data)[-1])
+
+
+  return mask_selection  
+
+@app.callback(
+    Output("school_closure", "value"), 
+    [Input("country", "value"), Input("updatebutton", "n_clicks")]) 
+
+def update_school_info(country, updatebutton):
+
+  school_options      = ["No", "Yes"]
+  country_NPI_data    = country_data[country]["NPI data"]["npi_school_closing"].fillna(method="ffill")
+  school_closure      = school_options [(np.array(country_NPI_data)[-1] > 0) * 1]
+
+  if (type(updatebutton)==list) | (type(updatebutton)==int):
+
+    if updatebutton > 0:
+
+      school_closure  = school_options [(np.array(country_NPI_data)[-1] > 0) * 1]
+
+
+  return school_closure    
+   
 
 #-----------------------------------------------------
 '''
