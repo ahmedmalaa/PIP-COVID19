@@ -439,6 +439,7 @@ RESULTS_DISPLAY   = html.Div(
         dbc.Row(dbc.Col(html.Div(NOTE_STATEMENT, style=PANEL_TEXT_STYLE2))),
         HORIZONTAL_SPACE(1.3),
         dbc.Row(html.Div(id='intermediate-value', style={'display': 'none'})),
+        dbc.Row(html.Div(id='R0-value', style={'display': 'none'})),
         ],  style={"box-shadow": BOX_SHADOW, "margin": MARGIN_INPUT, "background-color": PANEL_COLOR, "width": "800px"}),
 
     ]
@@ -484,6 +485,60 @@ popup = html.Div([
 
 app.layout = html.Div([popup, HEADER, html.Div([PATIENT_INFO_FORM, RESULTS_DISPLAY], className="row app-center")])
 
+@app.callback(
+    Output('R0-value', 'children'),
+    [Input("target", "value"), Input("horizonslider", "value"), Input("maskslider", "value"), Input("country", "value"),
+     Input("pipfit", "value"), Input("confidenceint", "value"), Input("dateslider", "value"), Input("socialdistance", "value"),
+     Input("school_closure", "value"), Input("logarithmic", "value"), Input("policybutton", "n_clicks"), Input("updatebutton", "n_clicks"),
+     Input('intermediate-value', 'children')],
+    [State('R0-value', 'children')]) 
+
+def save_R0(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, 
+            socialdistance, school_closure, logarithmic, policybutton, updatebutton, intermediate, R0_state):
+
+  npi_vars              = ["npi_workplace_closing", "npi_school_closing", "npi_cancel_public_events",  
+                           "npi_gatherings_restrictions", "npi_close_public_transport", "npi_stay_at_home", 
+                           "npi_internal_movement_restrictions", "npi_international_travel_controls", "npi_masks"]
+
+  npi_policy                                       = dict.fromkeys(npi_vars)                         
+
+  npi_policy['npi_workplace_closing']              = (np.sum(np.array(socialdistance)==0) > 0) * 2 + 1           #3 
+  npi_policy['npi_cancel_public_events']           = (np.sum(np.array(socialdistance)==1) > 0) * 1 + 1           #2 
+  npi_policy['npi_school_closing']                 = ((school_closure==True) | (school_closure=="Yes")) * 1 + 2  #3
+  npi_policy['npi_close_public_transport']         = (np.sum(np.array(socialdistance)==2) > 0) * 2               #2
+  npi_policy['npi_gatherings_restrictions']        = (np.sum(np.array(socialdistance)==3) > 0) * 4               #4
+  npi_policy['npi_stay_at_home']                   = (np.sum(np.array(socialdistance)==4) > 0) * 3               #3
+  npi_policy['npi_internal_movement_restrictions'] = 2
+  npi_policy['npi_international_travel_controls']  = (np.sum(np.array(socialdistance)==6) > 0) * 2 + 2           #4  
+  npi_policy['npi_masks']                          = maskslider * .5                                             #3
+  npi_policy['stringency']                         = 0   
+
+  policy_var            = (np.sum(np.array(socialdistance)==0) > 0) * (2**0)  
+  policy_var            = policy_var + (np.sum(np.array(socialdistance)==1) > 0) * (2**1) 
+  policy_var            = policy_var + (((school_closure==True) | (school_closure=="Yes")) * (2**2))
+  policy_var            = policy_var + (np.sum(np.array(socialdistance)==2) > 0)  * (2**3)
+  policy_var            = policy_var + (np.sum(np.array(socialdistance)==3) > 0)  * (2**4)
+  policy_var            = policy_var + (np.sum(np.array(socialdistance)==4) > 0)  * (2**5)
+  policy_var            = policy_var + (np.sum(np.array(socialdistance)==6) > 0)  * (2**6)
+  last_R0               = npi_model[int(maskslider)][int(policy_var)]
+
+  ctx                   = dash.callback_context
+
+  if (ctx.triggered[0]["prop_id"]=="intermediate-value.children") and (ctx.triggered[0]["value"]=='"policybutton.n_clicks"'):
+
+    output_saved        = json.dumps(str(last_R0))
+
+  elif (ctx.triggered[0]["prop_id"]=="intermediate-value.children") and (ctx.triggered[0]["value"]=='"updatebutton.n_clicks"'):
+  
+    output_saved        = json.dumps(str(1.0))  
+
+  else:
+
+    return R0_state
+
+  return output_saved
+
+
 @app.callback(Output('intermediate-value', 'children'), [Input("policybutton", "n_clicks"), Input("updatebutton", "n_clicks")])
 def save_clicks(policybutton, updatebutton):
 
@@ -491,7 +546,7 @@ def save_clicks(policybutton, updatebutton):
 
   if ctx.triggered[0]["prop_id"] == "policybutton.n_clicks":
 
-    last_click            = "policybutton.n_clicks" 
+    last_click            = "policybutton.n_clicks"
 
   elif ctx.triggered[0]["prop_id"] == "updatebutton.n_clicks":  
 
@@ -499,17 +554,17 @@ def save_clicks(policybutton, updatebutton):
 
 
   return json.dumps(last_click)
- 
+
 @app.callback(
     Output("covid_19_forecasts", "figure"),
     [Input("target", "value"), Input("horizonslider", "value"), Input("maskslider", "value"), Input("country", "value"),
      Input("pipfit", "value"), Input("confidenceint", "value"), Input("dateslider", "value"), Input("socialdistance", "value"),
      Input("school_closure", "value"), Input("logarithmic", "value"), Input("policybutton", "n_clicks"), Input("updatebutton", "n_clicks"),
-     Input('intermediate-value', 'children')]) 
+     Input('intermediate-value', 'children'), Input('R0-value', 'children')]) 
 
 
 def update_risk_score(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, 
-                      socialdistance, school_closure, logarithmic, policybutton, updatebutton, intermediate):
+                      socialdistance, school_closure, logarithmic, policybutton, updatebutton, intermediate, savedR0):
 
 
     """
@@ -622,25 +677,34 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
     if ctx.triggered[0]["prop_id"] == "policybutton.n_clicks":
 
-      R0_factor             = npi_model[int(maskslider)][int(policy_var )]
+      R0_factor             = npi_model[int(maskslider)][int(policy_var)]
       R_frcst               = current_R0 * R0_factor * np.ones(MAX_HORIZON)
+
+      save_R0(target, horizonslider, maskslider, country, pipfit, confidenceint, dateslider, 
+              socialdistance, school_closure, logarithmic, policybutton, updatebutton, intermediate, savedR0)
+
       save_clicks(policybutton, updatebutton)
 
     elif ctx.triggered[0]["prop_id"] == "updatebutton.n_clicks":  
 
       R_frcst               = current_R0 * np.ones(MAX_HORIZON) 
+
       save_clicks(policybutton, updatebutton)
 
     else:
     
       if json.loads(intermediate) == "policybutton.n_clicks":
 
-        R0_factor           = npi_model[int(maskslider)][int(policy_var )]
-        R_frcst             = current_R0 * R0_factor * np.ones(MAX_HORIZON) 
+        R0_factor           = npi_model[int(maskslider)][int(policy_var)]
+        R_frcst             = current_R0 * float(json.loads(savedR0)) * np.ones(MAX_HORIZON) 
+
+        #print(float(json.loads(savedR0)))
 
       if json.loads(intermediate) == "updatebutton.n_clicks": 
 
         R_frcst             = current_R0 * np.ones(MAX_HORIZON) 
+
+    #print(intermediate)  
 
     deaths_pred, _, R_t   = predictive_model.predict(DAYS_TILL_TODAY + MAX_HORIZON, R0_forecast=R_frcst)
     R0_t_forecast         = R_t 
