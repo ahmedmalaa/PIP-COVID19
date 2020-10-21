@@ -721,6 +721,22 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     deaths_forecast_u     = deaths_pred_u[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
     deaths_forecast_l     = deaths_pred_l[DAYS_TILL_TODAY - 1 : DAYS_TILL_TODAY + horizonslider - 1]
 
+    deaths_forecast_CI_u  = deaths_forecast_u - deaths_forecast
+    deaths_forecast_CI_l  = deaths_forecast - deaths_forecast_l 
+
+    CI_u_infliction       = np.where(np.diff(deaths_forecast_CI_u) < 0)[0]
+    CI_l_infliction       = np.where(np.diff(deaths_forecast_CI_l) < 0)[0]
+
+    if len(CI_u_infliction) > 0:
+
+      deaths_forecast_CI_u[CI_u_infliction[0]:] = np.max(deaths_forecast_CI_u)
+      deaths_forecast_u   = deaths_forecast + deaths_forecast_CI_u
+
+    if len(CI_l_infliction) > 0:
+
+      deaths_forecast_CI_l[CI_l_infliction[0]:] = np.max(deaths_forecast_CI_l)
+      deaths_forecast_l   = deaths_forecast - deaths_forecast_CI_l
+    
     deaths_forecast_l[deaths_forecast_l < 0] = 0 
 
     # -------------------------------------------------------------------------------------------------------------------------------------------
