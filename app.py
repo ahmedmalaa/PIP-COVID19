@@ -60,7 +60,7 @@ CYAN              = "#95E3FA"
 PURPLE_COLOR      = "#AF1CF7"
 DARK_PINK         = "#CA1A57"
 
-model_dates       = "/2020-10-08"
+model_dates       = "/2020-10-27"
 
 
 #-------------------------------------------------------
@@ -724,8 +724,12 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     deaths_forecast_CI_u  = deaths_forecast_u - deaths_forecast
     deaths_forecast_CI_l  = deaths_forecast - deaths_forecast_l 
 
+    deaths_forecast_CI_u[deaths_forecast_CI_u < 0] = 0
+    deaths_forecast_CI_l[deaths_forecast_CI_l < 0] = 0
+
     CI_u_infliction       = np.where(np.diff(deaths_forecast_CI_u) < 0)[0]
     CI_l_infliction       = np.where(np.diff(deaths_forecast_CI_l) < 0)[0]
+
 
     if len(CI_u_infliction) > 0:
 
@@ -736,7 +740,7 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
 
       deaths_forecast_CI_l[CI_l_infliction[0]:] = np.max(deaths_forecast_CI_l)
       deaths_forecast_l   = deaths_forecast - deaths_forecast_CI_l
-    
+
     deaths_forecast_l[deaths_forecast_l < 0] = 0 
 
     # -------------------------------------------------------------------------------------------------------------------------------------------
