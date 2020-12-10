@@ -612,6 +612,12 @@ def update_risk_score(target, horizonslider, maskslider, country, pipfit, confid
     NPI_data          = country_data[country]["NPI data"]
 
     deaths_true[deaths_true < 0] = 0
+
+    #####
+    deaths_true[-1]  = deaths_true[len(deaths_true)-2]
+    deaths_true[:22] = 0
+    #####
+
     deaths_smooth                = smooth_curve_1d(deaths_true)
     cumulative_deaths            = np.cumsum(deaths_true)
 
